@@ -1,0 +1,33 @@
+name: Build Linux Desktop
+
+on:
+  push:
+    tags: [ 'v*', 'release-*' ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Build Linux App (AppImage / deb)
+        run: npm run app:build:linux
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-artifacts
+          path: dist-desktop/**

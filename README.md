@@ -115,3 +115,33 @@ npx cap sync android
 
 ## 📄 License
 This project is open-source under the terms of the [MIT License](LICENSE).
+
+## 🛠️ CI / GitHub Actions
+
+We provide two GitHub Actions workflows that build distributable artifacts when you push a release tag or run the workflow manually:
+
+- **Linux Desktop**: `.github/workflows/linux-build.yml` — builds the web assets and packages an AppImage and `.deb` using `electron-builder`. Artifacts are uploaded from `dist-desktop/`.
+- **Android APK**: `.github/workflows/android-build.yml` — installs the Android SDK and runs the Gradle `assembleRelease` task inside the `android` folder. The resulting APKs are uploaded as workflow artifacts.
+
+Trigger these workflows by pushing a tag like `v1.0.0` or via the Actions tab.
+
+Local quick commands
+
+ - Build and package Linux desktop locally:
+
+```bash
+npm ci
+npm run build
+npm run app:build:linux
+```
+
+ - Build Android release APK locally (ensure Android SDK + Java installed):
+
+```bash
+npm run build
+cd android
+chmod +x gradlew
+./gradlew assembleRelease
+# APK located at android/app/build/outputs/apk/release/
+```
+
