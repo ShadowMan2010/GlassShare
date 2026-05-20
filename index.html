@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GlassShare - WebRTC Glassmorphic File Transfer</title>
+  <link rel="manifest" href="/manifest.json">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons (CDN) for UI icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="module" crossorigin src="/assets/index-CNf0jY5H.js"></script>
+</head>
+<body>
+  <!-- 3D visualizer canvas wrapper -->
+  <div id="canvas-container"></div>
+  
+  <!-- Dim overlay to simulate screen-off while keeping app running -->
+  <div id="dim-overlay" class="hidden">
+    <div class="dim-content">
+      <p>Screen Dimmed to Save Battery</p>
+      <small>Transfer will continue in the background.</small>
+      <button id="undim-btn" class="glass-btn small-btn">
+        <i data-lucide="sun"></i> Wake Screen
+      </button>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="glass-card header">
+      <div class="logo-section">
+        <div class="logo-glow"></div>
+        <h1 class="logo-text">Glass<span>Share</span></h1>
+      </div>
+      <div class="header-controls">
+        <div class="wakelock-indicator" id="wakelock-status-badge">
+          <i data-lucide="shield-alert" class="status-icon text-warning"></i>
+          <span>Wake Lock: Off</span>
+        </div>
+        <button id="dim-screen-btn" class="glass-btn icon-btn" title="Dim Screen for BG Transfer">
+          <i data-lucide="eye-off"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      
+      <!-- Left Column: Controls and Pairing -->
+      <section class="control-panel glass-card">
+        <!-- Mode Selector -->
+        <div class="panel-section">
+          <h2>Connection Mode</h2>
+          <div class="mode-toggle-group">
+            <button id="mode-local-btn" class="mode-btn active">
+              <i data-lucide="wifi"></i> Local Share
+            </button>
+            <button id="mode-remote-btn" class="mode-btn">
+              <i data-lucide="globe"></i> Device to Device
+            </button>
+          </div>
+          <p class="mode-description" id="mode-desc">
+            Shares directly on your local network using automated device discovery.
+          </p>
+        </div>
+
+        <!-- Network / Direct Status -->
+        <div class="panel-section status-section">
+          <h2>Device Information</h2>
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="label">Device Name:</span>
+              <span id="local-device-name" class="value text-glow">Detecting...</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Status:</span>
+              <span id="connection-status" class="value status-badge offline">Offline</span>
+            </div>
+            <div class="status-item hidden" id="signaling-server-ip-container">
+              <span class="label">Server IP:</span>
+              <input type="text" id="signaling-server-ip" placeholder="e.g. 192.168.1.100" class="glass-input">
+              <button id="connect-server-btn" class="glass-btn small-btn">Connect</button>
+            </div>
+            <div class="status-item hidden" id="room-code-container">
+              <span class="label">Room Code:</span>
+              <div class="room-code-wrapper">
+                <input type="text" id="room-code" placeholder="Enter Room Code" class="glass-input">
+                <button id="join-room-btn" class="glass-btn small-btn">Join</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- QR Code Pairing -->
+        <div class="panel-section qr-section">
+          <h2>Pair Devices</h2>
+          <div class="qr-buttons">
+            <button id="show-qr-btn" class="glass-btn">
+              <i data-lucide="qr-code"></i> Show Pairing QR
+            </button>
+            <button id="scan-qr-btn" class="glass-btn">
+              <i data-lucide="camera"></i> Scan QR Code
+            </button>
+          </div>
+          
+          <!-- Pairing Modal overlay (rendered inline here) -->
+          <div id="qr-modal" class="modal hidden">
+            <div class="modal-content glass-card">
+              <div class="modal-header">
+                <h3>Device Pairing QR</h3>
+                <button class="close-modal-btn" id="close-qr-modal">&times;</button>
+              </div>
+              <div class="modal-body">
+                <div id="qr-code-display"></div>
+                <p class="qr-instructions">Scan this QR code from your other device to connect instantly.</p>
+                <div id="qr-fallback-url" class="fallback-url-container"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Camera Scanner Modal -->
+          <div id="scanner-modal" class="modal hidden">
+            <div class="modal-content glass-card">
+              <div class="modal-header">
+                <h3>Scan Pairing QR</h3>
+                <button class="close-modal-btn" id="close-scanner-modal">&times;</button>
+              </div>
+              <div class="modal-body">
+                <div id="scanner-container"></div>
+                <p class="scanner-status" id="scanner-status-text">Initializing camera...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Background Sync & Wake Lock Settings -->
+        <div class="panel-section bg-transfer-section">
+          <div class="header-with-action">
+            <h2>Background Settings</h2>
+            <i data-lucide="help-circle" class="help-tooltip-icon" title="Wake Lock keeps your CPU active. Dim screen mode allows turning brightness down to simulate screen off."></i>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Enable Wake Lock</span>
+              <small>Keep system awake during file transfers</small>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="wakelock-toggle" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Dim Screen on Idle</span>
+              <small>Dims UI automatically during active transfers</small>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="auto-dim-toggle" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Interactive Visualizer and File Manager -->
+      <section class="workspace-panel">
+        <!-- 3D Visualization Zone -->
+        <div class="visualizer-overlay glass-card">
+          <div id="visualizer-state" class="visualizer-state-label">IDLE</div>
+          <div class="visualizer-subtext" id="visualizer-subtext">Ready to transfer files</div>
+        </div>
+
+        <!-- Peer List / Target Selection -->
+        <div class="glass-card peer-list-card">
+          <h2>Available Peer Devices</h2>
+          <div id="peers-grid" class="peers-grid">
+            <!-- Dynamic list of peers -->
+            <div class="no-peers-message">
+              <i data-lucide="compass" class="scanning-icon"></i>
+              <p>Scanning for nearby devices...</p>
+              <small>Make sure the app is open on the other device.</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- File Sender / Receiver Console -->
+        <div class="glass-card transfer-console">
+          <div class="console-tabs">
+            <button id="tab-send" class="console-tab active">Send Files</button>
+            <button id="tab-receive" class="console-tab">Received Files</button>
+          </div>
+
+          <!-- Send File Tab Content -->
+          <div id="send-pane" class="console-pane active">
+            <div class="drop-zone" id="file-drop-zone">
+              <i data-lucide="upload-cloud" class="upload-icon"></i>
+              <p>Drag & Drop files here or click to browse</p>
+              <small>Files are transferred securely peer-to-peer</small>
+              <input type="file" id="file-input" multiple class="hidden-file-input">
+            </div>
+            
+            <div id="selected-files-list" class="file-list hidden">
+              <!-- Selected Files will display here before sending -->
+            </div>
+            
+            <button id="send-btn" class="glass-btn primary-btn disabled-btn" disabled>
+              <i data-lucide="send"></i> Send to Selected Device
+            </button>
+          </div>
+
+          <!-- Received Files Tab Content -->
+          <div id="receive-pane" class="console-pane">
+            <div id="received-files-list" class="file-list">
+              <div class="no-files-message">
+                <i data-lucide="download" class="download-icon"></i>
+                <p>No files received yet</p>
+                <small>Connected peers can send you files directly</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+</body>
+</html>
