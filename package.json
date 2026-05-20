@@ -1,0 +1,49 @@
+{
+  "name": "glassshare",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "app:dev": "concurrently \"npm run dev\" \"wait-on https://localhost:5173 && NODE_ENV=development electron .\"",
+    "app:build:linux": "npm run build && electron-builder --linux"
+  },
+  "build": {
+    "appId": "app.glassshare.desktop",
+    "productName": "GlassShare",
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "html5-qrcode": "^2.3.8",
+    "qrcode": "^1.5.3",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.1.0",
+    "concurrently": "^9.2.1",
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
+    "vite": "^5.0.12",
+    "wait-on": "^9.0.10"
+  }
+}

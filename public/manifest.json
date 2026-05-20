@@ -1,0 +1,16 @@
+{
+  "short_name": "GlassShare",
+  "name": "GlassShare File Share",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#05040a",
+  "theme_color": "#a855f7",
+  "display": "standalone",
+  "orientation": "any"
+}
