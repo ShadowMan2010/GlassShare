@@ -1,7 +1,8 @@
 # GlassShare - Open Source WebRTC File Sharing App
 
 GlassShare is a responsive, secure, peer-to-peer file sharing application styled with premium dark glassmorphism design tokens. It utilizes WebRTC for secure connections, integrates a state-reactive Three.js 3D visualizer, features rapid QR-code pairing, and implements Screen Wake Lock APIs to ensure files transfer successfully in mobile background states.
-
+## Status
+🚧 This project is currently in development.
 ## 🚀 Key Features
 
 *   **Secure WebRTC DataChannels**: Peer-to-peer files are sliced into binary chunks and sent directly between devices with backpressure safety flow control.
@@ -144,4 +145,5 @@ chmod +x gradlew
 ./gradlew assembleRelease
 # APK located at android/app/build/outputs/apk/release/
 ```
-
+## Contributing
+Contributions, feedback, and ideas are welcome.
