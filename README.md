@@ -1,3 +1,4 @@
+<img width="1983" height="793" alt="ChatGPT Image May 21, 2026, 12_56_16 PM" src="https://github.com/user-attachments/assets/9c3e3d6d-1128-4145-9af7-e5358800a1e4" />
 # GlassShare - Open Source WebRTC File Sharing App
 
 GlassShare is a responsive, secure, peer-to-peer file sharing application styled with premium dark glassmorphism design tokens. It utilizes WebRTC for secure connections, integrates a state-reactive Three.js 3D visualizer, features rapid QR-code pairing, and implements Screen Wake Lock APIs to ensure files transfer successfully in mobile background states.
