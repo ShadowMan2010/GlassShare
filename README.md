@@ -1,4 +1,4 @@
-<img width="1024" height="1024" alt="GlassShare Logo" src="https://raw.githubusercontent.com/ShadowMan2010/GlassShare/main/public/app-icon.png" />
+<img https://github.com/ShadowMan2010/GlassShare/blob/main/banner.png />
 
 # GlassShare - Open Source WebRTC File Sharing App
 
