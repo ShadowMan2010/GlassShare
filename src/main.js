@@ -1,4 +1,4 @@
-import { initVisualizer, setVisualizerStatus } from './visualizer.js';
+import './style.css';
 import { setupWakeLockControls, requestWakeLock, releaseWakeLock } from './wakelock.js';
 import { generateQRCode, startQRScanner, stopQRScanner } from './qr.js';
 import * as WebRTC from './webrtc.js';
@@ -44,8 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
-  initVisualizer();
-  setVisualizerStatus('IDLE');
   setupWakeLockControls();
 
   localDeviceNameEl.textContent = WebRTC.localName;
@@ -272,20 +270,15 @@ function handleSocketStatusChange(status) {
 
 function handleConnectionStateChange(state) {
   if (state === 'connected') {
-    setVisualizerStatus('IDLE');
     if (targetPeerId) {
       const node = document.querySelector(`.peer-item[data-id="${targetPeerId}"]`);
       if (node) node.style.borderColor = 'var(--success)';
     }
     requestWakeLock();
-  } else if (state === 'connecting') {
-    setVisualizerStatus('CONNECTING');
   } else if (state === 'disconnected') {
-    setVisualizerStatus('IDLE');
     document.querySelectorAll('.peer-item').forEach(n => n.style.borderColor = '');
     releaseWakeLock();
   } else if (state === 'error') {
-    setVisualizerStatus('ERROR');
     releaseWakeLock();
   }
 }
@@ -341,12 +334,6 @@ function handleFileProgress(percent, filename, direction, bytesTransferred) {
   const isSending = direction === 'sending';
   const container = document.getElementById(isSending ? 'send-pane' : 'received-files-list');
   if (!container) return;
-
-  if (percent > 0 && percent < 100) {
-    setVisualizerStatus('TRANSFERRING');
-  } else if (percent >= 100) {
-    setVisualizerStatus('COMPLETED');
-  }
 
   let item = document.getElementById(`progress-${filename}`);
 

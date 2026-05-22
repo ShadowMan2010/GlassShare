@@ -11,8 +11,6 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-  <div id="canvas-container"></div>
-
   <div id="dim-overlay" class="hidden">
     <div class="dim-content">
       <p>Screen Dimmed to Save Battery</p>
@@ -25,8 +23,17 @@
 
   <div class="app-layout">
     <main class="main-area">
-      <div id="visualizer-state" class="viz-label">IDLE</div>
-      <div id="visualizer-subtext" class="viz-sub">Ready to transfer files</div>
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <p class="empty-title">GlassShare</p>
+        <p class="empty-sub">Select a device to start sharing</p>
+      </div>
     </main>
 
     <aside class="side-panel">
