@@ -27,7 +27,8 @@
         "AppImage",
         "deb"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "icon": "build/icon.png"
     }
   },
   "dependencies": {

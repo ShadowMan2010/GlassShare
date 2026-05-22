@@ -3,9 +3,14 @@
   "name": "GlassShare File Share",
   "icons": [
     {
-      "src": "icon.svg",
-      "type": "image/svg+xml",
-      "sizes": "any"
+      "src": "app-icon.png",
+      "type": "image/png",
+      "sizes": "1024x1024"
+    },
+    {
+      "src": "favicon.png",
+      "type": "image/png",
+      "sizes": "48x48"
     }
   ],
   "start_url": "/",
