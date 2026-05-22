@@ -1,8 +1,10 @@
 {
   "name": "glassshare",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.2.0",
+  "author": "ShadowMan2010 <shadowman2010@users.noreply.github.com>",
   "type": "module",
+  "description": "GlassShare - WebRTC peer-to-peer file sharing app",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --host",
