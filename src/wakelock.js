@@ -3,30 +3,19 @@
 let wakeLock = null;
 let wakeLockEnabled = true;
 
-// Update wake lock status badge
-function updateWakeLockBadge(isActive, errorMsg = null) {
+function updateWakeLockBadge(isActive) {
   const badge = document.getElementById('wakelock-status-badge');
   if (!badge) return;
 
-  const icon = badge.querySelector('.status-icon');
-  const text = badge.querySelector('span');
-
   if (isActive) {
-    badge.className = 'wakelock-indicator active';
-    icon.className = 'status-icon text-success';
-    icon.setAttribute('data-lucide', 'shield-check');
-    text.textContent = 'Wake Lock: Active';
+    badge.classList.add('active');
+    badge.innerHTML = '<i data-lucide="shield-check"></i>';
   } else {
-    badge.className = 'wakelock-indicator';
-    icon.className = 'status-icon text-warning';
-    icon.setAttribute('data-lucide', 'shield-alert');
-    text.textContent = errorMsg ? `Wake Lock: ${errorMsg}` : 'Wake Lock: Off';
+    badge.classList.remove('active');
+    badge.innerHTML = '<i data-lucide="shield-alert"></i>';
   }
-  
-  // Re-run Lucide icons render
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
+
+  if (window.lucide) window.lucide.createIcons();
 }
 
 // Request Screen Wake Lock
