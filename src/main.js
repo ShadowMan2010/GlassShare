@@ -1,9 +1,17 @@
 import './style.css';
 import { setupWakeLockControls, requestWakeLock, releaseWakeLock } from './wakelock.js';
 import { generateQRCode, startQRScanner, stopQRScanner } from './qr.js';
-import * as WebRTC from './webrtc.js';
+
+const isTauri = '__TAURI__' in window;
+
+let invoke, listen;
+if (isTauri) {
+  import('@tauri-apps/api/core').then(m => invoke = m.invoke);
+  import('@tauri-apps/api/event').then(m => listen = m.listen);
+}
 
 const localDeviceNameEl = document.getElementById('local-device-name');
+const localIpEl = document.getElementById('local-ip');
 const connectionStatusEl = document.getElementById('connection-status');
 const peersGridEl = document.getElementById('peers-grid');
 const fileInputEl = document.getElementById('file-input');
@@ -11,12 +19,6 @@ const fileDropZoneEl = document.getElementById('file-drop-zone');
 const selectedFilesListEl = document.getElementById('selected-files-list');
 const receivedFilesListEl = document.getElementById('received-files-list');
 const sendBtn = document.getElementById('send-btn');
-
-const modeLocalBtn = document.getElementById('mode-local-btn');
-const modeRemoteBtn = document.getElementById('mode-remote-btn');
-const modeDescEl = document.getElementById('mode-desc');
-const ipContainer = document.getElementById('signaling-server-ip-container');
-const roomCodeContainer = document.getElementById('room-code-container');
 
 const tabSendBtn = document.getElementById('tab-send');
 const tabReceiveBtn = document.getElementById('tab-receive');
@@ -33,63 +35,98 @@ const qrFallbackUrl = document.getElementById('qr-fallback-url');
 
 let selectedFiles = [];
 let targetPeerId = null;
-let roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-let signalingPort = '8080';
-let signalingServerIp = window.location.hostname;
-let lastProgressTime = 0;
-let lastProgressBytes = 0;
+let devices = [];
+let localIP = window.location.hostname;
+let localName = `Web-${Math.floor(100 + Math.random() * 900)}`;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
   setupWakeLockControls();
 
-  localDeviceNameEl.textContent = WebRTC.localName;
-  document.getElementById('room-code').value = roomCode;
+  if (isTauri) {
+    const { invoke: inv, listen: lis } = await Promise.all([
+      import('@tauri-apps/api/core'),
+      import('@tauri-apps/api/event')
+    ]);
+    invoke = inv.invoke;
+    listen = lis.listen;
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const defaultSignalingUrl = `${protocol}//${signalingServerIp}:${signalingPort}`;
-  document.getElementById('signaling-server-ip').value = signalingServerIp;
-  WebRTC.connectSignaling(defaultSignalingUrl);
+    const info = await invoke('get_local_info');
+    localIP = info.ip;
+    localName = info.name;
 
-  WebRTC.registerCallbacks({
-    onPeerListUpdate: renderPeerList,
-    onConnectionStateChange: handleConnectionStateChange,
-    onFileProgress: handleFileProgress,
-    onFileReceived: handleFileReceived,
-    onSocketStatusChange: handleSocketStatusChange
-  });
+    listen('discovery:device-found', (event) => {
+      const d = event.payload;
+      if (!devices.find(p => p.id === d.id)) {
+        devices.push(d);
+        renderPeerList();
+      }
+    });
+
+    listen('discovery:device-lost', (event) => {
+      devices = devices.filter(d => d.id !== event.payload);
+      renderPeerList();
+    });
+
+    listen('transfer:progress', (event) => {
+      const d = event.payload;
+      handleFileProgress(d.progress, d.name, d.direction, d.bytes);
+    });
+
+    listen('transfer:received', (event) => {
+      handleFileReceived(event.payload);
+    });
+  }
+
+  localDeviceNameEl.textContent = localName;
+  localIpEl.textContent = localIP;
+  connectionStatusEl.textContent = 'Online';
+  connectionStatusEl.className = 'stat-badge online';
 
   setupUIEventListeners();
-
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
+  if (window.lucide) window.lucide.createIcons();
 });
 
+function renderPeerList() {
+  peersGridEl.innerHTML = '';
+
+  if (devices.length === 0) {
+    peersGridEl.innerHTML = `<div class="no-peers"><i data-lucide="compass"></i><p>Scanning for devices...</p></div>`;
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+
+  devices.forEach(peer => {
+    const isSelected = peer.id === targetPeerId;
+    const node = document.createElement('div');
+    node.className = `peer-item ${isSelected ? 'selected' : ''}`;
+    node.dataset.id = peer.id;
+    const iconName = peer.device_type === 'mobile' ? 'smartphone' : 'monitor';
+    node.innerHTML = `<i data-lucide="${iconName}"></i><div><div class="name">${peer.name}</div><div class="type">${peer.device_type === 'mobile' ? 'Mobile' : 'Desktop'}</div></div>`;
+    node.addEventListener('click', () => {
+      if (isSelected) {
+        targetPeerId = null;
+        node.classList.remove('selected');
+        sendBtn.classList.add('disabled-btn');
+        sendBtn.disabled = true;
+      } else {
+        targetPeerId = peer.id;
+        document.querySelectorAll('.peer-item').forEach(n => n.classList.remove('selected'));
+        node.classList.add('selected');
+        sendBtn.classList.remove('disabled-btn');
+        sendBtn.disabled = false;
+      }
+    });
+    peersGridEl.appendChild(node);
+  });
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
 function setupUIEventListeners() {
-  modeLocalBtn.addEventListener('click', () => switchMode('local'));
-  modeRemoteBtn.addEventListener('click', () => switchMode('remote'));
-
-  document.getElementById('connect-server-btn').addEventListener('click', () => {
-    const ip = document.getElementById('signaling-server-ip').value.trim();
-    if (ip) {
-      signalingServerIp = ip;
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      WebRTC.connectSignaling(`${protocol}//${ip}:${signalingPort}`);
-    }
-  });
-
-  document.getElementById('join-room-btn').addEventListener('click', () => {
-    const code = document.getElementById('room-code').value.trim().toUpperCase();
-    if (code && WebRTC.socket && WebRTC.socket.readyState === WebSocket.OPEN) {
-      roomCode = code;
-      WebRTC.socket.send(JSON.stringify({ type: 'join-room', room: code }));
-    }
-  });
-
   tabSendBtn.addEventListener('click', () => {
     tabSendBtn.classList.add('active');
     tabReceiveBtn.classList.remove('active');
@@ -106,13 +143,9 @@ function setupUIEventListeners() {
 
   showQrBtn.addEventListener('click', () => {
     qrModal.classList.remove('hidden');
-    const pairingPayload = JSON.stringify({
-      server: signalingServerIp,
-      room: roomCode,
-      mode: WebRTC.connectionMode
-    });
-    generateQRCode('qr-code-display', pairingPayload);
-    qrFallbackUrl.textContent = `Server: ${signalingServerIp} | Room: ${roomCode}`;
+    const payload = JSON.stringify({ server: localIP, type: 'glassshare-peer' });
+    generateQRCode('qr-code-display', payload);
+    qrFallbackUrl.textContent = `IP: ${localIP}`;
   });
 
   closeQrModalBtn.addEventListener('click', () => qrModal.classList.add('hidden'));
@@ -128,205 +161,63 @@ function setupUIEventListeners() {
   });
 
   fileDropZoneEl.addEventListener('click', () => fileInputEl.click());
-
-  fileDropZoneEl.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    fileDropZoneEl.classList.add('dragover');
-  });
-
-  fileDropZoneEl.addEventListener('dragleave', () => {
-    fileDropZoneEl.classList.remove('dragover');
-  });
-
+  fileDropZoneEl.addEventListener('dragover', (e) => { e.preventDefault(); fileDropZoneEl.classList.add('dragover'); });
+  fileDropZoneEl.addEventListener('dragleave', () => { fileDropZoneEl.classList.remove('dragover'); });
   fileDropZoneEl.addEventListener('drop', (e) => {
     e.preventDefault();
     fileDropZoneEl.classList.remove('dragover');
-    if (e.dataTransfer.files.length > 0) {
-      handleFilesSelected(e.dataTransfer.files);
-    }
+    if (e.dataTransfer.files.length > 0) handleFilesSelected(e.dataTransfer.files);
   });
 
   fileInputEl.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      handleFilesSelected(e.target.files);
-    }
+    if (e.target.files.length > 0) handleFilesSelected(e.target.files);
   });
 
   sendBtn.addEventListener('click', () => {
     if (selectedFiles.length > 0 && targetPeerId) {
-      WebRTC.sendFiles(selectedFiles);
+      const peer = devices.find(d => d.id === targetPeerId);
+      if (!peer) return;
+      if (isTauri && invoke) {
+        const fileInfos = selectedFiles.map(f => ({
+          name: f.name, size: f.size, mime_type: f.type || 'application/octet-stream', path: f.path || f.name
+        }));
+        invoke('send_files', { targetIp: peer.ip, targetPort: peer.port, files: fileInfos });
+      }
     }
   });
-}
-
-function switchMode(mode) {
-  if (mode === 'local') {
-    modeLocalBtn.classList.add('active');
-    modeRemoteBtn.classList.remove('active');
-    modeDescEl.textContent = 'Shares directly on your local network';
-    ipContainer.classList.remove('hidden');
-    roomCodeContainer.classList.add('hidden');
-    WebRTC.setConnectionMode('local');
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    WebRTC.connectSignaling(`${protocol}//${signalingServerIp}:${signalingPort}`);
-  } else {
-    modeRemoteBtn.classList.add('active');
-    modeLocalBtn.classList.remove('active');
-    modeDescEl.textContent = 'Input matching room code to pair over WAN';
-    ipContainer.classList.add('hidden');
-    roomCodeContainer.classList.remove('hidden');
-    WebRTC.setConnectionMode('remote');
-    if (WebRTC.socket && WebRTC.socket.readyState === WebSocket.OPEN) {
-      WebRTC.socket.send(JSON.stringify({ type: 'join-room', room: roomCode }));
-    }
-  }
 }
 
 function handleScannedPayload(payload) {
   try {
     const config = JSON.parse(payload);
-    if (config.server && config.room) {
-      signalingServerIp = config.server;
-      roomCode = config.room;
-      document.getElementById('signaling-server-ip').value = config.server;
-      document.getElementById('room-code').value = config.room;
-      switchMode(config.mode || 'remote');
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      WebRTC.connectSignaling(`${protocol}//${config.server}:${signalingPort}`);
-    }
-  } catch (err) {
-    console.error('Invalid QR payload');
-  }
-}
-
-function renderPeerList(peers) {
-  peersGridEl.innerHTML = '';
-
-  if (peers.length === 0) {
-    peersGridEl.innerHTML = `
-      <div class="no-peers">
-        <i data-lucide="compass"></i>
-        <p>Scanning for devices...</p>
-      </div>
-    `;
-    if (window.lucide) window.lucide.createIcons();
-    return;
-  }
-
-  peers.forEach(peer => {
-    const isSelected = peer.id === targetPeerId;
-    const isConnected = WebRTC.activePeer && WebRTC.activePeer.id === peer.id;
-
-    const node = document.createElement('div');
-    node.className = `peer-item ${isSelected ? 'selected' : ''}`;
-    node.dataset.id = peer.id;
-
-    const iconName = peer.deviceType === 'mobile' ? 'smartphone' : 'monitor';
-
-    node.innerHTML = `
-      <i data-lucide="${iconName}"></i>
-      <div>
-        <div class="name">${peer.name}</div>
-        <div class="type">${peer.deviceType === 'mobile' ? 'Mobile' : 'Desktop'}</div>
-      </div>
-    `;
-
-    node.addEventListener('click', () => {
-      if (isSelected) {
-        targetPeerId = null;
-        node.classList.remove('selected');
-        sendBtn.classList.add('disabled-btn');
-        sendBtn.disabled = true;
-      } else {
-        targetPeerId = peer.id;
-        document.querySelectorAll('.peer-item').forEach(n => n.classList.remove('selected'));
-        node.classList.add('selected');
-        sendBtn.classList.remove('disabled-btn');
-        sendBtn.disabled = false;
-        if (!isConnected) {
-          WebRTC.initiateConnection(peer);
-        }
+    if (config.type === 'glassshare-peer' && config.server) {
+      const id = `manual-${config.server}`;
+      if (!devices.find(d => d.id === id)) {
+        devices.push({ id, name: config.name || `Device (${config.server})`, device_type: 'unknown', ip: config.server, port: 53317 });
+        renderPeerList();
       }
-    });
-
-    peersGridEl.appendChild(node);
-  });
-
-  if (window.lucide) window.lucide.createIcons();
-}
-
-function handleSocketStatusChange(status) {
-  if (status === 'online') {
-    connectionStatusEl.textContent = 'Online';
-    connectionStatusEl.className = 'stat-badge online';
-    if (WebRTC.connectionMode === 'remote') {
-      WebRTC.socket.send(JSON.stringify({ type: 'join-room', room: roomCode }));
     }
-  } else {
-    connectionStatusEl.textContent = 'Offline';
-    connectionStatusEl.className = 'stat-badge offline';
-  }
-}
-
-function handleConnectionStateChange(state) {
-  if (state === 'connected') {
-    if (targetPeerId) {
-      const node = document.querySelector(`.peer-item[data-id="${targetPeerId}"]`);
-      if (node) node.style.borderColor = 'var(--success)';
-    }
-    requestWakeLock();
-  } else if (state === 'disconnected') {
-    document.querySelectorAll('.peer-item').forEach(n => n.style.borderColor = '');
-    releaseWakeLock();
-  } else if (state === 'error') {
-    releaseWakeLock();
-  }
+  } catch (err) { console.error('Invalid QR payload'); }
 }
 
 function handleFilesSelected(filesList) {
   selectedFiles = Array.from(filesList);
   selectedFilesListEl.innerHTML = '';
   selectedFilesListEl.classList.remove('hidden');
-
   selectedFiles.forEach((file, index) => {
     const row = document.createElement('div');
     row.className = 'file-row';
-
     let icon = 'file';
     if (file.type.startsWith('image/')) icon = 'image';
     else if (file.type.startsWith('video/')) icon = 'video';
     else if (file.type.startsWith('audio/')) icon = 'music';
-
-    row.innerHTML = `
-      <i data-lucide="${icon}"></i>
-      <div class="info">
-        <div class="name">${file.name}</div>
-        <div class="meta">${formatBytes(file.size)}</div>
-      </div>
-      <button class="remove" data-index="${index}"><i data-lucide="x"></i></button>
-    `;
-
-    row.querySelector('.remove').addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectedFiles.splice(index, 1);
-      handleFilesSelected(selectedFiles);
-    });
-
+    row.innerHTML = `<i data-lucide="${icon}"></i><div class="info"><div class="name">${file.name}</div><div class="meta">${formatBytes(file.size)}</div></div><button class="remove" data-index="${index}"><i data-lucide="x"></i></button>`;
+    row.querySelector('.remove').addEventListener('click', (e) => { e.stopPropagation(); selectedFiles.splice(index, 1); handleFilesSelected(selectedFiles); });
     selectedFilesListEl.appendChild(row);
   });
-
-  if (selectedFiles.length === 0) {
-    selectedFilesListEl.classList.add('hidden');
-  }
-
-  if (selectedFiles.length > 0 && targetPeerId) {
-    sendBtn.classList.remove('disabled-btn');
-    sendBtn.disabled = false;
-  } else {
-    sendBtn.classList.add('disabled-btn');
-    sendBtn.disabled = true;
-  }
-
+  if (selectedFiles.length === 0) selectedFilesListEl.classList.add('hidden');
+  sendBtn.disabled = !(selectedFiles.length > 0 && targetPeerId);
+  sendBtn.classList.toggle('disabled-btn', sendBtn.disabled);
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -334,76 +225,24 @@ function handleFileProgress(percent, filename, direction, bytesTransferred) {
   const isSending = direction === 'sending';
   const container = document.getElementById(isSending ? 'send-pane' : 'received-files-list');
   if (!container) return;
-
   let item = document.getElementById(`progress-${filename}`);
-
-  const now = performance.now();
-  let speedText = '';
-  if (lastProgressTime > 0 && bytesTransferred > lastProgressBytes) {
-    const timeDelta = (now - lastProgressTime) / 1000;
-    const bytesDelta = bytesTransferred - lastProgressBytes;
-    if (timeDelta > 0.1) {
-      const speed = bytesDelta / timeDelta;
-      speedText = `${formatBytes(speed)}/s`;
-      lastProgressTime = now;
-      lastProgressBytes = bytesTransferred;
-    }
-  } else {
-    lastProgressTime = now;
-    lastProgressBytes = bytesTransferred;
-  }
-
   if (!item) {
     item = document.createElement('div');
     item.className = 'transfer-item';
     item.id = `progress-${filename}`;
-
-    item.innerHTML = `
-      <div class="transfer-head">
-        <span class="title">${isSending ? 'Sending' : 'Receiving'}: ${filename}</span>
-        <span class="pct" id="pct-${filename}">0%</span>
-      </div>
-      <div class="progress-bg">
-        <div class="progress-fill" id="bar-${filename}" style="width:0%"></div>
-      </div>
-      <div class="transfer-meta">
-        <span id="speed-${filename}">Calculating...</span>
-        <span id="size-${filename}">${formatBytes(bytesTransferred)}</span>
-      </div>
-    `;
-
-    if (isSending) {
-      container.insertBefore(item, sendBtn);
-    } else {
-      const empty = container.querySelector('.empty-files');
-      if (empty) empty.remove();
-      container.insertBefore(item, container.firstChild);
-    }
+    item.innerHTML = `<div class="transfer-head"><span class="title">${isSending ? 'Sending' : 'Receiving'}: ${filename}</span><span class="pct" id="pct-${filename}">0%</span></div><div class="progress-bg"><div class="progress-fill" id="bar-${filename}" style="width:0%"></div></div><div class="transfer-meta"><span>Transferring...</span><span id="size-${filename}">${formatBytes(bytesTransferred)}</span></div>`;
+    if (isSending) { container.insertBefore(item, sendBtn); }
+    else { const empty = container.querySelector('.empty-files'); if (empty) empty.remove(); container.insertBefore(item, container.firstChild); }
   } else {
     const pctEl = document.getElementById(`pct-${filename}`);
     const barEl = document.getElementById(`bar-${filename}`);
-    const speedEl = document.getElementById(`speed-${filename}`);
     const sizeEl = document.getElementById(`size-${filename}`);
-
     if (pctEl) pctEl.textContent = `${Math.floor(percent)}%`;
     if (barEl) barEl.style.width = `${percent}%`;
-    if (speedText && speedEl) speedEl.textContent = speedText;
     if (sizeEl) sizeEl.textContent = `${formatBytes(bytesTransferred)}`;
-
     if (percent >= 100) {
       const meta = item.querySelector('.transfer-meta');
-      if (meta) {
-        meta.innerHTML = `
-          <span class="success">Transfer Complete</span>
-          <span>Done</span>
-        `;
-      }
-
-      const autoDim = document.getElementById('auto-dim-toggle').checked;
-      if (autoDim && !isSending) {
-        document.getElementById('dim-overlay').classList.remove('hidden');
-      }
-
+      if (meta) meta.innerHTML = `<span class="success">Transfer Complete</span><span>Done</span>`;
       setTimeout(() => item.remove(), 5000);
     }
   }
@@ -412,24 +251,11 @@ function handleFileProgress(percent, filename, direction, bytesTransferred) {
 function handleFileReceived(file) {
   const container = document.getElementById('received-files-list');
   if (!container) return;
-
   const emptyMsg = container.querySelector('.empty-files');
   if (emptyMsg) emptyMsg.remove();
-
   const node = document.createElement('div');
   node.className = 'file-row';
-
-  node.innerHTML = `
-    <i data-lucide="file-check" style="color:var(--success)"></i>
-    <div class="info">
-      <div class="name">${file.name}</div>
-      <div class="meta">${formatBytes(file.size)} &bull; Complete</div>
-    </div>
-    <a href="${file.blobUrl}" download="${file.name}" class="panel-btn small primary" style="width:auto">
-      <i data-lucide="download"></i> Save
-    </a>
-  `;
-
+  node.innerHTML = `<i data-lucide="file-check" style="color:var(--success)"></i><div class="info"><div class="name">${file.name}</div><div class="meta">${formatBytes(file.size)} &bull; Complete</div></div>`;
   container.insertBefore(node, container.firstChild);
   if (window.lucide) window.lucide.createIcons();
 }

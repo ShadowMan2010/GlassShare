@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GlassShare - WebRTC File Transfer</title>
+  <title>GlassShare - Local File Sharing</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,34 +54,20 @@
 
       <div class="panel-body">
         <div class="panel-section">
-          <div class="section-label">Connection</div>
-          <div class="mode-switch">
-            <button id="mode-local-btn" class="mode-opt active">
-              <i data-lucide="wifi"></i> Local
-            </button>
-            <button id="mode-remote-btn" class="mode-opt">
-              <i data-lucide="globe"></i> Remote
-            </button>
-          </div>
-          <p class="mode-hint" id="mode-desc">Shares directly on your local network</p>
+          <div class="section-label">Discovery</div>
+          <p class="mode-hint" id="mode-desc">Devices found automatically on your network</p>
 
           <div class="status-row">
             <span class="stat-label">Device</span>
             <span id="local-device-name" class="stat-value">Detecting...</span>
           </div>
           <div class="status-row">
+            <span class="stat-label">IP</span>
+            <span id="local-ip" class="stat-value">Detecting...</span>
+          </div>
+          <div class="status-row">
             <span class="stat-label">Status</span>
-            <span id="connection-status" class="stat-badge offline">Offline</span>
-          </div>
-
-          <div id="signaling-server-ip-container" class="input-group">
-            <input type="text" id="signaling-server-ip" placeholder="Server IP" class="panel-input">
-            <button id="connect-server-btn" class="panel-btn small">Connect</button>
-          </div>
-
-          <div id="room-code-container" class="input-group hidden">
-            <input type="text" id="room-code" placeholder="Room Code" class="panel-input">
-            <button id="join-room-btn" class="panel-btn small">Join</button>
+            <span id="connection-status" class="stat-badge online">Online</span>
           </div>
         </div>
 

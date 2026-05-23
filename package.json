@@ -4,50 +4,23 @@
   "version": "1.2.0",
   "author": "ShadowMan2010 <shadowman2010@users.noreply.github.com>",
   "type": "module",
-  "description": "GlassShare - WebRTC peer-to-peer file sharing app",
-  "main": "electron/main.cjs",
+  "description": "GlassShare - Local peer-to-peer file sharing app",
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "app:dev": "concurrently \"npm run dev\" \"wait-on https://localhost:5173 && NODE_ENV=development electron .\"",
-    "app:build:linux": "npm run build && electron-builder --linux"
-  },
-  "build": {
-    "appId": "app.glassshare.desktop",
-    "productName": "GlassShare",
-    "directories": {
-      "output": "dist-desktop"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "build/**/*",
-      "package.json"
-    ],
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "Utility",
-      "icon": "build/icon.png"
-    }
+    "tauri": "tauri",
+    "app:dev": "tauri dev",
+    "app:build": "npm run build && tauri build"
   },
   "dependencies": {
-    "@capacitor/android": "^8.3.4",
-    "@capacitor/cli": "^8.3.4",
-    "@capacitor/core": "^8.3.4",
+    "@tauri-apps/api": "^2.11.0",
     "html5-qrcode": "^2.3.8",
-    "qrcode": "^1.5.3",
-    "three": "^0.160.0"
+    "qrcode": "^1.5.3"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.2",
     "@vitejs/plugin-basic-ssl": "^1.1.0",
-    "concurrently": "^9.2.1",
-    "electron": "^42.2.0",
-    "electron-builder": "^26.8.1",
-    "vite": "^5.0.12",
-    "wait-on": "^9.0.10"
+    "vite": "^5.0.12"
   }
 }
